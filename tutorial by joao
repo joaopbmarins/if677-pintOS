@@ -1,0 +1,65 @@
+
+VSCODE
+
+sudo dpkg -i code.deb //ignora se já tem o vscode instalado
+
+sudo apt install build-essential
+sudo apt install gdb
+
+sudo apt update
+sudo apt install apt-transport-https ca-certificates curl gnupg lsb-release
+
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+sudo apt update
+sudo apt install docker-ce docker-ce-cli containerd.io
+
+sudo usermod -aG docker nome_do_usuário
+
+reboot
+
+code --install-extension ms-vscode-remote.vscode-remote-extensionpack
+
+unzip pintos_dev_container.zip
+
+renomeia pintos_dev_container para pintos
+o /pintos/src/utils dele vai para a path
+
+abre o vscode nessa pasta
+f1 + "Dev Containers: Reopen in Container"
+
+---------------------------------------------------------------
+
+
+sudo apt install qemu-system-x86
+
+export PATH=$PATH:/home/seu_usuario/pintos/src/utils
+
+cd /pintos/src/utils
+make
+
+cd /pintos/src/thread/
+make
+
+//todos os comandos abaixo tem q ser no /pintos/src/thread/
+pintos --qemu -- run alarm-multiple // vc troca alarm-multiple pelo nome do teste
+
+ou
+
+pintos --qemu --		// assim vc só roda o pintos
+
+ou
+
+make check //roda todos os testes
+
+---------------------------------------------------------
+
+para debugar no vscode
+
+coloque o breakpoint no .c 
+run and debug
+[P1] Debug a Test
+digite o nome do teste que você quer executar 
+
