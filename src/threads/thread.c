@@ -92,6 +92,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
+  list_init (&threads_dormindo);  //inicializando a lista de thread dormindo
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -120,10 +121,23 @@ thread_start (void)
 /* Called by the timer interrupt handler at each timer tick.
    Thus, this function runs in an external interrupt context. */
 void
-thread_tick (void) 
+thread_tick (int64_t ticks) 
 {
-  struct thread *t = thread_current ();
+  //IMPLEMENTAMOS
+  struct list_elem *cursor;
+  cursor = list_begin(&threads_dormindo);
+  while(cursor != list_end(&threads_dormindo)){//pecorrer a lista das threads que estão dormindo e acorda ela se o tempo chegou
+    struct thread *tmp = list_entry(cursor, struct thread, elem);
+    if(ticks >= tmp->acorda_ticks){//se o tempo atual for maior que o tempo de hibernacao da thread ela acorda
+      cursor = list_remove(cursor);
+      thread_unblock(tmp);
+    }
+    else{//se o tempo ainda nao foi suficiente nao vai ser suficiente para os outros tambem pois esta ordenado
+      break;
+    }
+  }
 
+  struct thread *t = thread_current ();
   /* Update statistics. */
   if (t == idle_thread)
     idle_ticks++;
@@ -240,6 +254,18 @@ thread_unblock (struct thread *t)
   list_push_back (&ready_list, &t->elem);
   t->status = THREAD_READY;
   intr_set_level (old_level);
+}
+
+/*Funcao que dita a ordem da lista*/
+bool thread_comparar_tempo_acordar(const struct list_elem *a, const struct list_elem *b, void *aux){
+  
+  ASSERT(a != NULL);
+  ASSERT(b != NULL);
+
+  struct thread *t1 = list_entry(a, struct thread, elem);
+  struct thread *t2 = list_entry(b, struct thread, elem);
+
+  return t1->acorda_ticks < t2->acorda_ticks;
 }
 
 /* Returns the name of the running thread. */
@@ -462,6 +488,7 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+  t->acorda_ticks = 0;
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();
