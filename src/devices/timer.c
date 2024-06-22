@@ -182,7 +182,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
   
   if(ticks%4==0){
     // a cada 4 ticks, recalcula a prioridade 
-    // thread_foreach(thread_calcular_prioridade, NULL);
+    thread_foreach(thread_calcular_prioridade, NULL);
   }
 
   struct thread *t = thread_current();
@@ -192,7 +192,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
   }
 
   if(ticks%TIMER_FREQ==0){
-    // thread_foreach(thread_calcular_recent_cpu, NULL);
+    thread_foreach(thread_calcular_recent_cpu, NULL);
     thread_calcular_load_avg();
   }
 

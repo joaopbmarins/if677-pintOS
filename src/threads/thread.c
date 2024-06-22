@@ -24,6 +24,9 @@
    that are ready to run but not actually running. */
 static struct list ready_list;
 
+/*Array com 64 listas do MFQ*/
+static struct list mfq[64];
+
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
@@ -93,6 +96,10 @@ thread_init (void)
   list_init (&ready_list);
   list_init (&all_list);
   list_init (&threads_dormindo);  //inicializando a lista de thread dormindo
+
+  for(int i=0;i<64;i++){
+    list_init (&mfq[i]);
+  }
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -358,7 +365,7 @@ thread_foreach (thread_action_func *func, void *aux)
 }
 
 /* Calcular prioridade com base em recent_cpu e nice e setar ela*/
-thread_action_func *
+void
 thread_calcular_prioridade (struct thread *t, void *aux)
 {
   int new_priority = PRI_MAX - (t->recent_cpu / 4) - (t->valor_nice * 2);
@@ -433,7 +440,7 @@ thread_get_load_avg (void)
 }
 
 /* Calcula recent_cpu*/
-thread_action_func *
+void
 thread_calcular_recent_cpu (struct thread *t, void *aux){
   int load_avg = thread_get_load_avg();
   int valor_nice = t->valor_nice;
