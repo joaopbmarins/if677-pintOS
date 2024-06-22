@@ -357,6 +357,21 @@ thread_foreach (thread_action_func *func, void *aux)
     }
 }
 
+/* Calcular prioridade com base em recent_cpu e nice e setar ela*/
+void
+thread_calcular_prioridade ()
+{
+  struct thread *t = thread_current();
+
+  int new_priority = PRI_MAX - (t->recent_cpu / 4) - (t->valor_nice * 2);
+
+  // reajusta prioridade caso ultrapasse os limites
+  if(new_priority>PRI_MAX) new_priority = PRI_MAX;
+  else if(new_priority<PRI_MIN) new_priority = PRI_MIN;
+
+  thread_set_priority(new_priority);
+}
+
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) 
@@ -373,7 +388,7 @@ thread_get_priority (void)
 
 /* Sets the current thread's nice value to NICE. */
 void
-thread_set_nice (int nice UNUSED) 
+thread_set_nice (int nice) 
 {
   /* Not yet implemented. */
 }
@@ -382,7 +397,14 @@ thread_set_nice (int nice UNUSED)
 int
 thread_get_nice (void) 
 {
-  /* Not yet implemented. */
+  return thread_current ()->valor_nice;
+}
+
+/* Calcula load_avg*/
+int
+thread_calcular_load_avg (void)
+{
+  
   return 0;
 }
 
@@ -394,12 +416,22 @@ thread_get_load_avg (void)
   return 0;
 }
 
+/* Calcula recent_cpu*/
+thread_action_func *
+thread_calcular_recent_cpu (struct thread *t, void *aux){
+  int load_avg = thread_get_load_avg();
+  int valor_nice = t->valor_nice;
+  int recent_cpu = t->recent_cpu;
+
+  t->recent_cpu = (2*load_avg)/(2*load_avg + 1) * recent_cpu + valor_nice;
+}
+
+
 /* Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  return thread_current ()->recent_cpu * 100;
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -489,6 +521,8 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->acorda_ticks = 0;
+  t->valor_nice = 0;
+  t->recent_cpu = 0;
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();

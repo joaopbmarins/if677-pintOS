@@ -178,6 +178,23 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick (ticks);
+  if(ticks%4==0){
+    // a cada 4 ticks, recalcula a prioridade 
+    thread_calcular_prioridade();
+  }
+
+  struct thread *t = thread_current();
+
+  if(t!=idle_thread()){
+    t->recent_cpu++;
+  }
+
+  enum intr_level old_level = intr_disable();
+  if(ticks%TIMER_FREQ==0){
+    thread_foreach(thread_calcular_recent_cpu, NULL);
+  }
+  intr_set_level(old_level);
+
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
