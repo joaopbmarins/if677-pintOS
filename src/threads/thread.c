@@ -358,18 +358,16 @@ thread_foreach (thread_action_func *func, void *aux)
 }
 
 /* Calcular prioridade com base em recent_cpu e nice e setar ela*/
-void
-thread_calcular_prioridade ()
+thread_action_func *
+thread_calcular_prioridade (struct thread *t, void *aux)
 {
-  struct thread *t = thread_current();
-
   int new_priority = PRI_MAX - (t->recent_cpu / 4) - (t->valor_nice * 2);
 
   // reajusta prioridade caso ultrapasse os limites
   if(new_priority>PRI_MAX) new_priority = PRI_MAX;
   else if(new_priority<PRI_MIN) new_priority = PRI_MIN;
 
-  thread_set_priority(new_priority);
+  t->priority = new_priority;
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
@@ -388,9 +386,10 @@ thread_get_priority (void)
 
 /* Sets the current thread's nice value to NICE. */
 void
-thread_set_nice (int nice) 
+thread_set_nice (int new_nice) 
 {
-  /* Not yet implemented. */
+  thread_current ()->valor_nice = new_nice;
+  thread_calcular_prioridade(thread_current(), NULL);
 }
 
 /* Returns the current thread's nice value. */
@@ -400,20 +399,37 @@ thread_get_nice (void)
   return thread_current ()->valor_nice;
 }
 
-/* Calcula load_avg*/
+/* Contar threads em estado rodando e pronto*/
 int
+thread_contar_threads (void)
+{
+  int contador = 0;
+  struct list_elem *e;
+
+  for (e = list_begin (&all_list); e != list_end (&all_list);
+       e = list_next (e))
+    {
+      struct thread *t = list_entry (e, struct thread, allelem);
+      if(t->status == THREAD_RUNNING || t->status == THREAD_READY){
+        contador++;
+      }
+    }
+  return contador;
+}
+
+/* Calcula load_avg*/
+void
 thread_calcular_load_avg (void)
 {
-  
-  return 0;
+  int count = thread_contar_threads();
+  load_avg = (59/60)*load_avg + (1/60)*count;
 }
 
 /* Returns 100 times the system load average. */
 int
 thread_get_load_avg (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  return load_avg*100;
 }
 
 /* Calcula recent_cpu*/
@@ -472,6 +488,11 @@ idle (void *idle_started_ UNUSED)
     }
 }
 
+/* Return idle thread*/
+struct thread* get_idle_thread(){
+  return idle_thread;
+}
+
 /* Function used as the basis for a kernel thread. */
 static void
 kernel_thread (thread_func *function, void *aux) 
@@ -524,6 +545,14 @@ init_thread (struct thread *t, const char *name, int priority)
   t->valor_nice = 0;
   t->recent_cpu = 0;
   t->magic = THREAD_MAGIC;
+
+  int new_priority = PRI_MAX - (t->recent_cpu / 4) - (t->valor_nice * 2);
+
+  // reajusta prioridade caso ultrapasse os limites
+  if(new_priority>PRI_MAX) new_priority = PRI_MAX;
+  else if(new_priority<PRI_MIN) new_priority = PRI_MIN;
+
+  t->priority = new_priority;
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);

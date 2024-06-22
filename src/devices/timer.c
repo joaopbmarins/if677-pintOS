@@ -37,6 +37,7 @@ timer_init (void)
 {
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
+  load_avg = 0;
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -178,22 +179,22 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick (ticks);
+  
   if(ticks%4==0){
     // a cada 4 ticks, recalcula a prioridade 
-    thread_calcular_prioridade();
+    // thread_foreach(thread_calcular_prioridade, NULL);
   }
 
   struct thread *t = thread_current();
 
-  if(t!=idle_thread()){
+  if(t!=get_idle_thread()){
     t->recent_cpu++;
   }
 
-  enum intr_level old_level = intr_disable();
   if(ticks%TIMER_FREQ==0){
-    thread_foreach(thread_calcular_recent_cpu, NULL);
+    // thread_foreach(thread_calcular_recent_cpu, NULL);
+    thread_calcular_load_avg();
   }
-  intr_set_level(old_level);
 
 }
 

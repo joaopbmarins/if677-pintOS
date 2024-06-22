@@ -1,4 +1,7 @@
 {
     "editor.formatOnSave": false,
     "C_Cpp.formatting": "clangFormat",
+    "files.associations": {
+        "pit.h": "c"
+    },
 }

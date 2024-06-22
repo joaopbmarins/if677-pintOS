@@ -136,7 +136,7 @@ void thread_yield (void);
 typedef void thread_action_func (struct thread *t, void *aux);
 void thread_foreach (thread_action_func *, void *);
 
-void thread_calcular_prioridade ();
+thread_action_func* thread_calcular_prioridade (struct thread *t, void *aux);
 int thread_get_priority (void);
 void thread_set_priority (int);
 
@@ -144,6 +144,11 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 thread_action_func* thread_calcular_recent_cpu (struct thread *t, void *aux);
 int thread_get_recent_cpu (void);
+int thread_contar_threads (void);
+int load_avg;
+void thread_calcular_load_avg (void);
 int thread_get_load_avg (void);
+
+struct thread* get_idle_thread(void);
 
 #endif /* threads/thread.h */
