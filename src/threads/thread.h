@@ -139,6 +139,7 @@ void thread_foreach (thread_action_func *, void *);
 void thread_calcular_prioridade ();
 int thread_get_priority (void);
 void thread_set_priority (int);
+struct thread* get_idle_thread(void);
 
 int thread_get_nice (void);
 void thread_set_nice (int);

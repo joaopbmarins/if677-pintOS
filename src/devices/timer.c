@@ -185,7 +185,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
 
   struct thread *t = thread_current();
 
-  if(t!=idle_thread()){
+  if(t!= get_idle_thread()){
     t->recent_cpu++;
   }
 
