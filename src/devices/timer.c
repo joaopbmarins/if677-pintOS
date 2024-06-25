@@ -37,7 +37,6 @@ timer_init (void)
 {
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
-  load_avg = 0;
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
