@@ -97,7 +97,9 @@ thread_init (void)
   list_init (&all_list);
   list_init (&threads_dormindo);  //inicializando a lista de thread dormindo
 
-  for(int i=0;i<64;i++){
+  load_avg = 0; //inicializando load_avg no início
+
+  for(int i=0;i<64;i++){ //criando as listas de prioridade do mfq
     list_init (&mfq[i]);
   }
 
@@ -417,7 +419,7 @@ thread_contar_threads (void)
        e = list_next (e))
     {
       struct thread *t = list_entry (e, struct thread, allelem);
-      if(t->status == THREAD_RUNNING || t->status == THREAD_READY){
+      if((t->status == THREAD_RUNNING || t->status == THREAD_READY) && t != idle_thread){
         contador++;
       }
     }
@@ -549,8 +551,15 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->acorda_ticks = 0;
-  t->valor_nice = 0;
-  t->recent_cpu = 0;
+  if(t == initial_thread){
+    t->valor_nice = 0;
+    t->recent_cpu = 0;
+  }
+  else{
+    struct thread *thread_pai = thread_current();
+    t->valor_nice = thread_pai->valor_nice;
+    t->recent_cpu = thread_pai->recent_cpu;
+  }
   t->magic = THREAD_MAGIC;
 
   int new_priority = PRI_MAX - (t->recent_cpu / 4) - (t->valor_nice * 2);
