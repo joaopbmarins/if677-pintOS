@@ -3,6 +3,7 @@
 
 #include <debug.h>
 #include <list.h>
+#include "lib/float.h"
 #include <stdint.h>
 
 /* States in a thread's life cycle. */
@@ -91,7 +92,7 @@ struct thread
     int acorda_ticks;                   /* Quantos ticks tem que dormir a thread*/
     struct list_elem allelem;           /* List element for all threads list. */
     int valor_nice;                     /* Valor nice da thread*/
-    int recent_cpu;                     /* Valor do recent cpu*/
+    float_type recent_cpu;                     /* Valor do recent cpu*/
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
@@ -145,7 +146,7 @@ void thread_set_nice (int);
 void thread_calcular_recent_cpu (struct thread *t, void *aux);
 int thread_get_recent_cpu (void);
 int thread_contar_threads (void);
-int load_avg;
+float_type load_avg;
 void thread_calcular_load_avg (void);
 int thread_get_load_avg (void);
 

@@ -4,6 +4,7 @@
 #include <random.h>
 #include <stdio.h>
 #include <string.h>
+#include "lib/float.h"
 #include "threads/flags.h"
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
@@ -97,7 +98,8 @@ thread_init (void)
   list_init (&all_list);
   list_init (&threads_dormindo);  //inicializando a lista de thread dormindo
 
-  load_avg = 0; //inicializando load_avg no início
+  //load_avg = 0; //inicializando load_avg no início
+  load_avg = FLOAT_CONST(0);
 
   for(int i=0;i<64;i++){ //criando as listas de prioridade do mfq
     list_init (&mfq[i]);
@@ -370,7 +372,8 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_calcular_prioridade (struct thread *t, void *aux)
 {
-  int new_priority = PRI_MAX - (t->recent_cpu / 4) - (t->valor_nice * 2);
+  //int new_priority = PRI_MAX - (t->recent_cpu / 4) - (t->valor_nice * 2);
+  int new_priority = (int) FLOAT_INT_PART(FLOAT_ADD(FLOAT_SUB_MIX(FLOAT_SUB_MIX((FLOAT_DIV_MIX(t->recent_cpu, 4)), (t->valor_nice * 2)), 0), PRI_MAX));
 
   // reajusta prioridade caso ultrapasse os limites
   if(new_priority>PRI_MAX) new_priority = PRI_MAX;
@@ -431,24 +434,25 @@ void
 thread_calcular_load_avg (void)
 {
   int count = thread_contar_threads();
-  load_avg = (59/60)*load_avg + (1/60)*count;
+  //load_avg = (59/60)*load_avg + (1/60)*count;
+  load_avg = FLOAT_ADD(FLOAT_MULT(load_avg, FLOAT_DIV(FLOAT_CONST(59), FLOAT_CONST(60))), FLOAT_MULT_MIX(FLOAT_DIV(FLOAT_CONST(1), FLOAT_CONST(60)), count));
 }
 
 /* Returns 100 times the system load average. */
 int
 thread_get_load_avg (void) 
 {
-  return load_avg*100;
+  return ((int)FLOAT_ROUND(load_avg)) * 100;
 }
 
 /* Calcula recent_cpu*/
 void
 thread_calcular_recent_cpu (struct thread *t, void *aux){
-  int load_avg = thread_get_load_avg();
   int valor_nice = t->valor_nice;
-  int recent_cpu = t->recent_cpu;
+  float_type recent_cpu = t->recent_cpu;
 
-  t->recent_cpu = (2*load_avg)/(2*load_avg + 1) * recent_cpu + valor_nice;
+  //t->recent_cpu = (2*load_avg)/(2*load_avg + 1) * recent_cpu + valor_nice;
+  t->recent_cpu = FLOAT_ADD_MIX(FLOAT_MULT(FLOAT_DIV(FLOAT_MULT_MIX(load_avg, 2), FLOAT_ADD_MIX(FLOAT_MULT_MIX(load_avg, 2),1)), recent_cpu), valor_nice);
 }
 
 
@@ -456,7 +460,7 @@ thread_calcular_recent_cpu (struct thread *t, void *aux){
 int
 thread_get_recent_cpu (void) 
 {
-  return thread_current ()->recent_cpu * 100;
+  return ((int) FLOAT_ROUND(thread_current ()->recent_cpu)) * 100;
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.

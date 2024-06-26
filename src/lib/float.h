@@ -5,7 +5,7 @@
 int mypow(int p);
 typedef int float_type;
 
-#define FOAT_CONST(A) ((float_type)(A * F))
+#define FLOAT_CONST(A) ((float_type)(A * F))
 #define FLOAT_ADD(A, B) (A + B)
 #define FLOAT_ADD_MIX(A, B) (A + (B * F))
 #define FLOAT_SUB(A, B) (A - B)
