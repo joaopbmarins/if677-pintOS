@@ -25,9 +25,6 @@
    that are ready to run but not actually running. */
 static struct list ready_list;
 
-/*Array com 64 listas do MFQ*/
-static struct list mfq[64];
-
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
@@ -61,7 +58,7 @@ static unsigned thread_ticks;   /* # of timer ticks since last yield. */
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
-bool thread_mlfqs = true;
+bool thread_mlfqs = false;
 
 static void kernel_thread (thread_func *, void *aux);
 
@@ -100,10 +97,6 @@ thread_init (void)
 
   //load_avg = 0; //inicializando load_avg no início
   load_avg = FLOAT_CONST(0);
-
-  for(int i=0;i<64;i++){ //criando as listas de prioridade do mfq
-    list_init (&mfq[i]);
-  }
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -368,6 +361,17 @@ thread_foreach (thread_action_func *func, void *aux)
     }
 }
 
+/* Comparar prioridade*/
+bool* thread_comparar_prioridade(const struct list_elem *a, const struct list_elem *b, void *aux){
+  ASSERT(a != NULL);
+  ASSERT(b != NULL);
+
+  struct thread *t1 = list_entry(a, struct thread, elem);
+  struct thread *t2 = list_entry(b, struct thread, elem);
+
+  return t1->priority > t2->priority;
+}
+
 /* Calcular prioridade com base em recent_cpu e nice e setar ela*/
 void
 thread_calcular_prioridade (struct thread *t, void *aux)
@@ -379,7 +383,16 @@ thread_calcular_prioridade (struct thread *t, void *aux)
   if(new_priority>PRI_MAX) new_priority = PRI_MAX;
   else if(new_priority<PRI_MIN) new_priority = PRI_MIN;
 
-  t->priority = new_priority;
+  if (new_priority > t->priority){
+    t->priority = new_priority;
+    list_sort(&ready_list, thread_comparar_prioridade, NULL);  
+  } else if (new_priority < t->priority){
+    t->priority = new_priority;
+    list_sort(&ready_list, thread_comparar_prioridade, NULL);
+  } else {
+    t->priority = new_priority;
+  }
+
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
@@ -433,7 +446,8 @@ thread_contar_threads (void)
 void
 thread_calcular_load_avg (void)
 {
-  int count = thread_contar_threads();
+  // int count = thread_contar_threads();
+  int count = list_size(&ready_list) + (thread_current() != idle_thread);
   //load_avg = (59/60)*load_avg + (1/60)*count;
   load_avg = FLOAT_ADD(FLOAT_MULT(load_avg, FLOAT_DIV(FLOAT_CONST(59), FLOAT_CONST(60))), FLOAT_MULT_MIX(FLOAT_DIV(FLOAT_CONST(1), FLOAT_CONST(60)), count));
 }
@@ -557,7 +571,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->acorda_ticks = 0;
   if(t == initial_thread){
     t->valor_nice = 0;
-    t->recent_cpu = 0;
+    t->recent_cpu = FLOAT_CONST(0);
   }
   else{
     struct thread *thread_pai = thread_current();
