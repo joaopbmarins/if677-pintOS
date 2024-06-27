@@ -399,7 +399,9 @@ thread_calcular_prioridade (struct thread *t, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->priority = new_priority;
+  if(!thread_mlfqs){
+    thread_current ()->priority = new_priority;
+  }
 }
 
 /* Returns the current thread's priority. */
@@ -446,8 +448,8 @@ thread_contar_threads (void)
 void
 thread_calcular_load_avg (void)
 {
-  // int count = thread_contar_threads();
-  int count = list_size(&ready_list) + (thread_current() != idle_thread);
+  int count = thread_contar_threads();
+  // int count = list_size(&ready_list) + (thread_current() != idle_thread);
   //load_avg = (59/60)*load_avg + (1/60)*count;
   load_avg = FLOAT_ADD(FLOAT_MULT(load_avg, FLOAT_DIV(FLOAT_CONST(59), FLOAT_CONST(60))), FLOAT_MULT_MIX(FLOAT_DIV(FLOAT_CONST(1), FLOAT_CONST(60)), count));
 }
@@ -567,7 +569,20 @@ init_thread (struct thread *t, const char *name, int priority)
   t->status = THREAD_BLOCKED;
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
-  t->priority = priority;
+  if(thread_mlfqs){
+    t->priority = PRI_DEFAULT;
+      // int new_priority = PRI_MAX - (t->recent_cpu / 4) - (t->valor_nice * 2);
+    int new_priority = (int) FLOAT_INT_PART(FLOAT_ADD(FLOAT_SUB_MIX(FLOAT_SUB_MIX((FLOAT_DIV_MIX(t->recent_cpu, 4)), (t->valor_nice * 2)), 0), PRI_MAX));
+
+    // reajusta prioridade caso ultrapasse os limites
+    if(new_priority>PRI_MAX) new_priority = PRI_MAX;
+    else if(new_priority<PRI_MIN) new_priority = PRI_MIN;
+
+    t->priority = new_priority;
+  }
+  else{
+    t->priority = priority;
+  }
   t->acorda_ticks = 0;
   if(t == initial_thread){
     t->valor_nice = 0;
@@ -580,16 +595,8 @@ init_thread (struct thread *t, const char *name, int priority)
   }
   t->magic = THREAD_MAGIC;
 
-  int new_priority = PRI_MAX - (t->recent_cpu / 4) - (t->valor_nice * 2);
-
-  // reajusta prioridade caso ultrapasse os limites
-  if(new_priority>PRI_MAX) new_priority = PRI_MAX;
-  else if(new_priority<PRI_MIN) new_priority = PRI_MIN;
-
-  t->priority = new_priority;
-
   old_level = intr_disable ();
-  list_push_back (&all_list, &t->allelem);
+  list_insert_ordered (&all_list, &t->allelem, thread_comparar_prioridade, NULL);
   intr_set_level (old_level);
 }
 

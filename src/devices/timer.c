@@ -188,8 +188,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
   struct thread *t = thread_current();
 
   if(t!=get_idle_thread()){
-    //t->recent_cpu++;
-    FLOAT_ADD_MIX(t->recent_cpu, 1);
+    t->recent_cpu = FLOAT_ADD_MIX(t->recent_cpu, 1);
   }
 
   if(ticks%TIMER_FREQ==0){
