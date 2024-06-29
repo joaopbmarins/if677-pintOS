@@ -261,7 +261,7 @@ thread_unblock (struct thread *t)
 }
 
 /*Funcao que dita a ordem da lista*/
-bool thread_comparar_tempo_acordar(const struct list_elem *a, const struct list_elem *b, void *aux){
+bool thread_comparar_tempo_acordar(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
   
   ASSERT(a != NULL);
   ASSERT(b != NULL);
@@ -326,6 +326,17 @@ thread_exit (void)
   NOT_REACHED ();
 }
 
+/* Comparar prioridade*/
+bool thread_comparar_prioridade(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
+  ASSERT(a != NULL);
+  ASSERT(b != NULL);
+
+  struct thread *t1 = list_entry(a, struct thread, elem);
+  struct thread *t2 = list_entry(b, struct thread, elem);
+
+  return t1->priority > t2->priority;
+}
+
 /* Yields the CPU.  The current thread is not put to sleep and
    may be scheduled again immediately at the scheduler's whim. */
 void
@@ -337,8 +348,10 @@ thread_yield (void)
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
-  if (cur != idle_thread) 
+  if (cur != idle_thread) {
     list_push_back (&ready_list, &cur->elem);
+    list_sort(&ready_list, thread_comparar_prioridade, NULL);
+  }
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -361,20 +374,9 @@ thread_foreach (thread_action_func *func, void *aux)
     }
 }
 
-/* Comparar prioridade*/
-bool* thread_comparar_prioridade(const struct list_elem *a, const struct list_elem *b, void *aux){
-  ASSERT(a != NULL);
-  ASSERT(b != NULL);
-
-  struct thread *t1 = list_entry(a, struct thread, elem);
-  struct thread *t2 = list_entry(b, struct thread, elem);
-
-  return t1->priority > t2->priority;
-}
-
 /* Calcular prioridade com base em recent_cpu e nice e setar ela*/
 void
-thread_calcular_prioridade (struct thread *t, void *aux)
+thread_calcular_prioridade (struct thread *t, void *aux UNUSED)
 {
   //int new_priority = PRI_MAX - (t->recent_cpu / 4) - (t->valor_nice * 2);
   int new_priority = (int) FLOAT_INT_PART(FLOAT_ADD(FLOAT_SUB_MIX(FLOAT_SUB_MIX((FLOAT_DIV_MIX(t->recent_cpu, 4)), (t->valor_nice * 2)), 0), PRI_MAX));
@@ -383,14 +385,15 @@ thread_calcular_prioridade (struct thread *t, void *aux)
   if(new_priority>PRI_MAX) new_priority = PRI_MAX;
   else if(new_priority<PRI_MIN) new_priority = PRI_MIN;
 
-  if (new_priority > t->priority){
-    t->priority = new_priority;
-    list_sort(&ready_list, thread_comparar_prioridade, NULL);  
-  } else if (new_priority < t->priority){
-    t->priority = new_priority;
-    list_sort(&ready_list, thread_comparar_prioridade, NULL);
-  } else {
-    t->priority = new_priority;
+  t->priority = new_priority;
+  list_sort(&ready_list, thread_comparar_prioridade, NULL);  
+  if(new_priority > thread_current()->priority){
+    if(intr_get_level() == INTR_ON){
+      thread_yield();
+    }
+    else{//dentro da interrupção
+      intr_yield_on_return();
+    }
   }
 
 }
@@ -400,7 +403,11 @@ void
 thread_set_priority (int new_priority) 
 {
   if(!thread_mlfqs){
+    int old_priority = thread_current ()->priority;
     thread_current ()->priority = new_priority;
+    if(new_priority > old_priority){
+      thread_yield();
+    }
   }
 }
 
@@ -416,7 +423,11 @@ void
 thread_set_nice (int new_nice) 
 {
   thread_current ()->valor_nice = new_nice;
+  int old_priority = thread_current()->priority;
   thread_calcular_prioridade(thread_current(), NULL);
+  if(thread_current()->priority < old_priority){
+    thread_yield();
+  }
 }
 
 /* Returns the current thread's nice value. */
@@ -463,7 +474,7 @@ thread_get_load_avg (void)
 
 /* Calcula recent_cpu*/
 void
-thread_calcular_recent_cpu (struct thread *t, void *aux){
+thread_calcular_recent_cpu (struct thread *t, void *aux UNUSED){
   int valor_nice = t->valor_nice;
   float_type recent_cpu = t->recent_cpu;
 
