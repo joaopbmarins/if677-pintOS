@@ -255,7 +255,8 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
+  list_insert_ordered(&ready_list, &t->elem, thread_comparar_prioridade, NULL);
+  //list_push_back (&ready_list, &t->elem);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -349,8 +350,7 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) {
-    list_push_back (&ready_list, &cur->elem);
-    list_sort(&ready_list, thread_comparar_prioridade, NULL);
+    list_insert_ordered(&ready_list, &cur->elem, thread_comparar_prioridade, NULL);
   }
   cur->status = THREAD_READY;
   schedule ();
@@ -378,15 +378,13 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_calcular_prioridade (struct thread *t, void *aux UNUSED)
 {
-  //int new_priority = PRI_MAX - (t->recent_cpu / 4) - (t->valor_nice * 2);
-  int new_priority = (int) FLOAT_INT_PART(FLOAT_ADD(FLOAT_SUB_MIX(FLOAT_SUB_MIX((FLOAT_DIV_MIX(t->recent_cpu, 4)), (t->valor_nice * 2)), 0), PRI_MAX));
+  int new_priority = (int) FLOAT_ROUND(FLOAT_SUB(FLOAT_CONST(PRI_MAX), FLOAT_ADD(FLOAT_DIV_MIX(t->recent_cpu,4),FLOAT_CONST(t->valor_nice * 2))));
 
   // reajusta prioridade caso ultrapasse os limites
   if(new_priority>PRI_MAX) new_priority = PRI_MAX;
   else if(new_priority<PRI_MIN) new_priority = PRI_MIN;
 
   t->priority = new_priority;
-  list_sort(&ready_list, thread_comparar_prioridade, NULL);  
   if(new_priority > thread_current()->priority){
     if(intr_get_level() == INTR_ON){
       thread_yield();
@@ -394,6 +392,10 @@ thread_calcular_prioridade (struct thread *t, void *aux UNUSED)
     else{//dentro da interrupção
       intr_yield_on_return();
     }
+  }
+
+  if(list_entry(list_prev(list_end(&all_list)), struct thread, allelem) == t){
+    list_sort(&ready_list, thread_comparar_prioridade, NULL);  
   }
 
 }
@@ -425,9 +427,7 @@ thread_set_nice (int new_nice)
   thread_current ()->valor_nice = new_nice;
   int old_priority = thread_current()->priority;
   thread_calcular_prioridade(thread_current(), NULL);
-  if(thread_current()->priority < old_priority){
-    thread_yield();
-  }
+
 }
 
 /* Returns the current thread's nice value. */
@@ -444,14 +444,18 @@ thread_contar_threads (void)
   int contador = 0;
   struct list_elem *e;
 
-  for (e = list_begin (&all_list); e != list_end (&all_list);
-       e = list_next (e))
+  enum intr_level old_level = intr_disable();
+
+  for (e = list_begin (&all_list); e != list_end (&all_list); e = list_next (e))
     {
       struct thread *t = list_entry (e, struct thread, allelem);
       if((t->status == THREAD_RUNNING || t->status == THREAD_READY) && t != idle_thread){
         contador++;
       }
     }
+
+  intr_set_level(old_level);
+
   return contador;
 }
 
@@ -460,16 +464,14 @@ void
 thread_calcular_load_avg (void)
 {
   int count = thread_contar_threads();
-  // int count = list_size(&ready_list) + (thread_current() != idle_thread);
-  //load_avg = (59/60)*load_avg + (1/60)*count;
-  load_avg = FLOAT_ADD(FLOAT_MULT(load_avg, FLOAT_DIV(FLOAT_CONST(59), FLOAT_CONST(60))), FLOAT_MULT_MIX(FLOAT_DIV(FLOAT_CONST(1), FLOAT_CONST(60)), count));
+  load_avg = (float_type) FLOAT_ADD(FLOAT_MULT(load_avg, FLOAT_DIV(FLOAT_CONST(59), FLOAT_CONST(60))), FLOAT_MULT_MIX(FLOAT_DIV(FLOAT_CONST(1), FLOAT_CONST(60)), count));
 }
 
 /* Returns 100 times the system load average. */
 int
 thread_get_load_avg (void) 
 {
-  return ((int)FLOAT_ROUND(load_avg)) * 100;
+  return (int) FLOAT_ROUND(FLOAT_MULT_MIX(load_avg, 100));
 }
 
 /* Calcula recent_cpu*/
@@ -478,8 +480,7 @@ thread_calcular_recent_cpu (struct thread *t, void *aux UNUSED){
   int valor_nice = t->valor_nice;
   float_type recent_cpu = t->recent_cpu;
 
-  //t->recent_cpu = (2*load_avg)/(2*load_avg + 1) * recent_cpu + valor_nice;
-  t->recent_cpu = FLOAT_ADD_MIX(FLOAT_MULT(FLOAT_DIV(FLOAT_MULT_MIX(load_avg, 2), FLOAT_ADD_MIX(FLOAT_MULT_MIX(load_avg, 2),1)), recent_cpu), valor_nice);
+  t->recent_cpu = (float_type) FLOAT_ADD_MIX(FLOAT_MULT(FLOAT_DIV(FLOAT_MULT_MIX(load_avg, 2), FLOAT_ADD_MIX(FLOAT_MULT_MIX(load_avg, 2),1)), recent_cpu), valor_nice);
 }
 
 
@@ -487,7 +488,7 @@ thread_calcular_recent_cpu (struct thread *t, void *aux UNUSED){
 int
 thread_get_recent_cpu (void) 
 {
-  return ((int) FLOAT_ROUND(thread_current ()->recent_cpu)) * 100;
+  return (int) FLOAT_ROUND(FLOAT_MULT_MIX(thread_current()->recent_cpu, 100));
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -580,20 +581,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->status = THREAD_BLOCKED;
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
-  if(thread_mlfqs){
-    t->priority = PRI_DEFAULT;
-      // int new_priority = PRI_MAX - (t->recent_cpu / 4) - (t->valor_nice * 2);
-    int new_priority = (int) FLOAT_INT_PART(FLOAT_ADD(FLOAT_SUB_MIX(FLOAT_SUB_MIX((FLOAT_DIV_MIX(t->recent_cpu, 4)), (t->valor_nice * 2)), 0), PRI_MAX));
 
-    // reajusta prioridade caso ultrapasse os limites
-    if(new_priority>PRI_MAX) new_priority = PRI_MAX;
-    else if(new_priority<PRI_MIN) new_priority = PRI_MIN;
-
-    t->priority = new_priority;
-  }
-  else{
-    t->priority = priority;
-  }
   t->acorda_ticks = 0;
   if(t == initial_thread){
     t->valor_nice = 0;
@@ -604,10 +592,26 @@ init_thread (struct thread *t, const char *name, int priority)
     t->valor_nice = thread_pai->valor_nice;
     t->recent_cpu = thread_pai->recent_cpu;
   }
+
+  if(thread_mlfqs){
+    t->priority = PRI_DEFAULT;
+    
+    int new_priority = (int) FLOAT_ROUND(FLOAT_SUB(FLOAT_CONST(PRI_MAX), FLOAT_ADD(FLOAT_DIV_MIX(t->recent_cpu,4),FLOAT_CONST(t->valor_nice * 2))));
+
+    // reajusta prioridade caso ultrapasse os limites
+    if(new_priority>PRI_MAX) new_priority = PRI_MAX;
+    else if(new_priority<PRI_MIN) new_priority = PRI_MIN;
+
+    t->priority = new_priority;
+  }
+  else{
+    t->priority = priority;
+  }
+
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();
-  list_insert_ordered (&all_list, &t->allelem, thread_comparar_prioridade, NULL);
+  list_push_back(&all_list, &t->allelem);
   intr_set_level (old_level);
 }
 
