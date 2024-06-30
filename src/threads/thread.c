@@ -424,7 +424,6 @@ void
 thread_set_nice (int new_nice) 
 {
   thread_current ()->valor_nice = new_nice;
-  int old_priority = thread_current()->priority;
   thread_calcular_prioridade(thread_current(), NULL);
 
 }
