@@ -192,7 +192,6 @@ timer_interrupt (struct intr_frame *args UNUSED)
   }
   
   if(ticks%4==0){// a cada 4 ticks, recalcula a prioridade 
-    int old_priority = thread_current()->priority;
     thread_foreach(thread_calcular_prioridade, NULL);
   }
 
