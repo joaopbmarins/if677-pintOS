@@ -93,14 +93,13 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
-  list_init (&threads_dormindo);  //inicializando a lista de thread dormindo
+  list_init (&threads_dormindo);  //inicializando a lista de thread dormindo (ALARM)
 
-  //load_avg = 0; //inicializando load_avg no início
-  load_avg = FLOAT_CONST(0);
+  load_avg = FLOAT_CONST(0); //inicializando o load_avg no inicio do sistema (ADVANCED)
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
-  init_thread (initial_thread, "main", PRI_DEFAULT);
+  init_thread (initial_thread, "main", PRI_DEFAULT); //cria a thread inicial
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
 }
@@ -219,7 +218,7 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);//thread está pronta para a execução
 
-  if(t->priority > thread_current()->priority){
+  if(t->priority > thread_current()->priority){ //se a thread criada tiver maior prioridade, pula
     thread_yield();
   }
 
@@ -259,12 +258,12 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_insert_ordered(&ready_list, &t->elem, thread_comparar_prioridade, NULL);
+  list_insert_ordered(&ready_list, &t->elem, thread_comparar_prioridade, NULL); //inserir ja de forma odrenada em relação a prioridade
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
 
-/*Funcao que dita a ordem da lista*/
+/*Funcao que dita a ordem da lista de threads dormindo*/
 bool thread_comparar_tempo_acordar(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
   
   ASSERT(a != NULL);
@@ -330,7 +329,7 @@ thread_exit (void)
   NOT_REACHED ();
 }
 
-/* Comparar prioridade*/
+/* Função de comparar prioridade para ordenar na ready_list*/
 bool thread_comparar_prioridade(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
   ASSERT(a != NULL);
   ASSERT(b != NULL);
@@ -388,11 +387,11 @@ thread_calcular_prioridade (struct thread *t, void *aux UNUSED)
   else if(new_priority<PRI_MIN) new_priority = PRI_MIN;
 
   t->priority = new_priority;
-  if(new_priority > thread_current()->priority){
+  if(new_priority > thread_current()->priority){ //se a prioridade calculada for maior que a atual, pula a thread
     if(intr_get_level() == INTR_ON){
       thread_yield();
     }
-    else{//dentro da interrupção
+    else{//pular a thread dentro da interrupção
       intr_yield_on_return();
     }
   }
@@ -407,10 +406,10 @@ thread_calcular_prioridade (struct thread *t, void *aux UNUSED)
 void
 thread_set_priority (int new_priority) 
 {
-  if(!thread_mlfqs){
+  if(!thread_mlfqs){ //se mlfqs for ativada, deve ignorar set_priority
     int old_priority = thread_current ()->priority;
     thread_current ()->priority = new_priority;
-    if(new_priority > old_priority){
+    if(new_priority > old_priority){ //se a prioridade calculada for maior que a atual, pula a thread
       thread_yield();
     }
   }
@@ -428,8 +427,8 @@ void
 thread_set_nice (int new_nice) 
 {
   thread_current ()->valor_nice = new_nice;
+  //depois de calcular o nice, recalcula a nova prioridade daquela thread
   thread_calcular_prioridade(thread_current(), NULL);
-
 }
 
 /* Returns the current thread's nice value. */
@@ -532,7 +531,7 @@ idle (void *idle_started_ UNUSED)
 }
 
 /* Return idle thread*/
-struct thread* get_idle_thread(){
+struct thread* get_idle_thread(){ //para poder acessar a idle thread em outro arquivo
   return idle_thread;
 }
 
@@ -584,20 +583,21 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
 
-  t->acorda_ticks = 0;
-  if(t == initial_thread){
+  t->acorda_ticks = 0; //variável até que tempo (em ticks) a thread ficará dormindo
+  if(t == initial_thread){ //se a thread for a inicial, seta seus parâmetros como 0
     t->valor_nice = 0;
     t->recent_cpu = FLOAT_CONST(0);
   }
-  else{
+  else{ //se nao for a 'main', recebe os valores por herança
     struct thread *thread_pai = thread_current();
     t->valor_nice = thread_pai->valor_nice;
     t->recent_cpu = thread_pai->recent_cpu;
   }
 
-  if(thread_mlfqs){
+  if(thread_mlfqs){ //se thread_mlfqs == true, ignora a prioridade passada por parâmetro
     t->priority = PRI_DEFAULT;
     
+    //prioridade calculada baseada no dado pela documentação do projeto
     int new_priority = (int) FLOAT_ROUND(FLOAT_SUB(FLOAT_CONST(PRI_MAX), FLOAT_ADD(FLOAT_DIV_MIX(t->recent_cpu,4),FLOAT_CONST(t->valor_nice * 2))));
 
     // reajusta prioridade caso ultrapasse os limites
