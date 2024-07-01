@@ -535,11 +535,6 @@ idle (void *idle_started_ UNUSED)
     }
 }
 
-/* Return idle thread*/
-struct thread* get_idle_thread(){ //para poder acessar a idle thread em outro arquivo
-  return idle_thread;
-}
-
 /* Function used as the basis for a kernel thread. */
 static void
 kernel_thread (thread_func *function, void *aux) 

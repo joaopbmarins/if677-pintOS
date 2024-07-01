@@ -153,6 +153,4 @@ float_type load_avg;
 void thread_calcular_load_avg (void);
 int thread_get_load_avg (void);
 
-struct thread* get_idle_thread(void);
-
 #endif /* threads/thread.h */
