@@ -3,6 +3,7 @@
 #include <inttypes.h>
 #include <round.h>
 #include <stdio.h>
+#include "lib/float.h"
 #include "devices/pit.h"
 #include "threads/interrupt.h"
 #include "threads/synch.h"
@@ -93,10 +94,10 @@ timer_sleep (int64_t ticks)
   ASSERT (intr_get_level () == INTR_ON);
 
   struct thread *t = thread_current();
-  t->acorda_ticks = ticks + start;
+  t->acorda_ticks = ticks + start; //tempo de dormida da thread
 
   enum intr_level old_level = intr_disable();
-  list_insert_ordered(&threads_dormindo, &t->elem, thread_comparar_tempo_acordar, NULL);
+  list_insert_ordered(&threads_dormindo, &t->elem, thread_comparar_tempo_acordar, NULL); //insere na lista de threads dormindo em ordem de quem deve acordar primeiro
   thread_block();
   intr_set_level(old_level);
   
@@ -178,22 +179,21 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick (ticks);
-  if(ticks%4==0){
-    // a cada 4 ticks, recalcula a prioridade 
-    thread_calcular_prioridade();
-  }
-
+  
   struct thread *t = thread_current();
 
-  if(t!= get_idle_thread()){
-    t->recent_cpu++;
+  if(t!=get_idle_thread()){
+    t->recent_cpu = FLOAT_ADD_MIX(t->recent_cpu, 1); //incrementa o recent_cpu em 1 se a thread nao for a idle_thread
   }
 
-  enum intr_level old_level = intr_disable();
-  if(ticks%TIMER_FREQ==0){
+  if(ticks%TIMER_FREQ==0){ //a cada segundo recalcula o recent_cpu de todas as threads e o load_avg do sistema
     thread_foreach(thread_calcular_recent_cpu, NULL);
+    thread_calcular_load_avg();
   }
-  intr_set_level(old_level);
+  
+  if(ticks%4==0){// a cada 4 ticks, recalcula a prioridade 
+    thread_foreach(thread_calcular_prioridade, NULL);
+  }
 
 }
 
