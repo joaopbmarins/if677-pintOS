@@ -375,6 +375,11 @@ thread_foreach (thread_action_func *func, void *aux)
       func (t, aux);
     }
 }
+/*return idle thread pointer*/
+struct thread* get_idle_thread(void){
+  return idle_thread;
+}
+
 
 /* Calcular prioridade com base em recent_cpu e nice e setar ela*/
 void
